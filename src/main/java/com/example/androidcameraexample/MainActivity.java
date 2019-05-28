@@ -1,19 +1,17 @@
 package com.example.androidcameraexample;
 
 import android.Manifest;
+import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
-import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
-import android.hardware.Camera;
 import android.hardware.Camera;
 import android.location.Location;
+import android.location.LocationManager;
 import android.media.ExifInterface;
-import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import android.support.annotation.NonNull;
-import android.support.annotation.Nullable;
 import android.support.design.widget.Snackbar;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
@@ -23,30 +21,20 @@ import android.view.SurfaceView;
 import android.view.View;
 import android.view.WindowManager;
 import android.widget.Button;
-import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
-
-import java.io.File;
-import java.io.IOException;
-
-import static android.media.ExifInterface.TAG_GPS_LATITUDE;
-import static android.media.ExifInterface.TAG_GPS_LATITUDE_REF;
-import static android.media.ExifInterface.TAG_GPS_LONGITUDE;
-import static android.media.ExifInterface.TAG_GPS_LONGITUDE_REF;
-import static android.media.ExifInterface.TAG_IMAGE_LENGTH;
-import static android.media.ExifInterface.TAG_MAKE;
-import static android.media.ExifInterface.TAG_MODEL;
 
 
 public class MainActivity extends AppCompatActivity
         implements ActivityCompat.OnRequestPermissionsResultCallback {
-    final static int REQUEST_IMAGE_CAPTURE = 1111;
+    public static double latitude1;
+    public static double longitude1;
+
     private static final String TAG = "android_camera_example";
     private static final int PERMISSIONS_REQUEST_CODE = 100;
     String[] REQUIRED_PERMISSIONS  = {Manifest.permission.CAMERA,
             Manifest.permission.WRITE_EXTERNAL_STORAGE,Manifest.permission.ACCESS_FINE_LOCATION};
-    private static final int CAMERA_FACING = Camera.CameraInfo.CAMERA_FACING_BACK; // Camera.CameraInfo.CAMERA_FACING_FRONT
+    private static final int CAMERA_FACING = Camera.CameraInfo.CAMERA_FACING_BACK; //urfuruuu Camera.CameraInfo.CAMERA_FACING_FRONT
 
     private SurfaceView surfaceView;
     private CameraPreview mCameraPreview;
@@ -69,10 +57,31 @@ public class MainActivity extends AppCompatActivity
                 WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
 
         setContentView(R.layout.activity_main);
+        Button button3 = (Button) findViewById(R.id.button3);
+        final LocationManager lm = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
+        button3.setOnClickListener(new View.OnClickListener() {
 
+        public void onClick(View v) {
+            Log.d("test","debug 확인");
+            if (Build.VERSION.SDK_INT >= 23 &&
+                    ContextCompat.checkSelfPermission(getApplicationContext(), android.Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                ActivityCompat.requestPermissions(MainActivity.this, new String[]{android.Manifest.permission.ACCESS_FINE_LOCATION},
+                        0);
+            } else {
+
+                Location location = lm.getLastKnownLocation(LocationManager.GPS_PROVIDER);
+                String provider = location.getProvider();
+                longitude1 = location.getLongitude();
+                latitude1 = location.getLatitude();
+                double altitude = location.getAltitude();
+                Log.d("test", "메인"+String.valueOf(longitude1));
+                Log.d("test", "메인"+String.valueOf(latitude1));
+                Toast.makeText(getApplicationContext() ,"좌표값을받아왔습니다"+String.valueOf(longitude1)+String.valueOf(latitude1),Toast.LENGTH_LONG).show();
+            }
+        }
+        });
         mLayout = findViewById(R.id.layout_main);
         surfaceView = findViewById(R.id.camera_preview_main);
-
 
         // 런타임 퍼미션 완료될때 까지 화면에서 보이지 않게 해야합니다.
         surfaceView.setVisibility(View.GONE);
@@ -93,8 +102,7 @@ public class MainActivity extends AppCompatActivity
                 mCameraPreview.takePicture();
             }
         });
-       mView =  findViewById(R.id.textView);
-
+        mView =  findViewById(R.id.textView);
 /*
          String filename = Environment.getExternalStorageDirectory().getPath() ;
         String fileName = String.format("%d.JPEG", System.currentTimeMillis());
@@ -117,7 +125,7 @@ public class MainActivity extends AppCompatActivity
             int writeExternalStoragePermission = ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE);
             if ( cameraPermission == PackageManager.PERMISSION_GRANTED
                     && writeExternalStoragePermission == PackageManager.PERMISSION_GRANTED
-            && locasionPermission == PackageManager.PERMISSION_GRANTED)  {
+                    && locasionPermission == PackageManager.PERMISSION_GRANTED)  {
                 startCamera();
 
 
@@ -132,8 +140,8 @@ public class MainActivity extends AppCompatActivity
                         public void onClick(View view) {
 
                             ActivityCompat.requestPermissions( MainActivity.this, REQUIRED_PERMISSIONS,
-                        PERMISSIONS_REQUEST_CODE);
-                    }
+                                    PERMISSIONS_REQUEST_CODE);
+                        }
                     }).show();
 
 
@@ -162,8 +170,6 @@ public class MainActivity extends AppCompatActivity
 
     }
 
-
-
     void startCamera(){
 
         // Create the Preview view and set it as the content of this Activity.
@@ -171,47 +177,53 @@ public class MainActivity extends AppCompatActivity
 
     }
 
+    /*
+        @Override
+        protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
+            super.onActivityResult(requestCode, resultCode, data);
 
-    @Override
-    protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
+            if(requestCode==REQUEST_IMAGE_CAPTURE && requestCode == RESULT_OK){
+                Bitmap bitmap = BitmapFactory.decodeFile(imageFilePath);
+                ExifInterface exif = new ExifInterface(imageFilePath);
 
-        if(requestCode==REQUEST_IMAGE_CAPTURE && requestCode == RESULT_OK){
-            Bitmap bitmap = BitmapFactory.decodeFile(imageFilePath);
-            ExifInterface exif = null;
-            exif.setAttribute(TAG_GPS_LATITUDE,"33");
-            exif.setAttribute(TAG_GPS_LATITUDE_REF,"33");
-            exif.setAttribute(TAG_GPS_LONGITUDE,"33");
-            exif.setAttribute(TAG_GPS_LONGITUDE_REF,"33");
-            exif.setAttribute(TAG_IMAGE_LENGTH,"33");
-            exif.setAttribute(TAG_MODEL,"33");
-            exif.setAttribute(TAG_MAKE,"33");
-            try {
-                exif.saveAttributes();
-            } catch (IOException e) {
-                Toast.makeText(getApplicationContext(),"씨발 또안대냐",Toast.LENGTH_LONG).show();
-                e.printStackTrace();
+                try{
+
+                }catch(Exception e){
+                    e.printStackTrace();
+                }
+                exif.setAttribute(TAG_GPS_LATITUDE,"33");
+                exif.setAttribute(TAG_GPS_LATITUDE_REF,"33");
+                exif.setAttribute(TAG_GPS_LONGITUDE,"33");
+                exif.setAttribute(TAG_GPS_LONGITUDE_REF,"33");
+                exif.setAttribute(TAG_IMAGE_LENGTH,"33");
+                exif.setAttribute(TAG_MODEL,"33");
+                exif.setAttribute(TAG_MAKE,"33");
+                try {
+                    exif.saveAttributes();
+                } catch (IOException e) {
+                    Toast.makeText(getApplicationContext(),"씨발 또안대냐",Toast.LENGTH_LONG).show();
+                    e.printStackTrace();
+                }
+                try{
+                    exif = new ExifInterface(imageFilePath); // 이미지의 정보를 생성.
+
+                }catch(IOException e){
+                    e.printStackTrace();
+                }
+
+                int exifOrientation;
+                int exifDegree;
+                if(exif!=null){
+                    exifOrientation = exif.getAttributeInt(ExifInterface.TAG_ORIENTATION,
+                            ExifInterface.ORIENTATION_NORMAL);
+
+                } else{
+                    exifDegree=0;
+                }
+
             }
-            try{
-                exif = new ExifInterface(imageFilePath); // 이미지의 정보를 생성.
-
-            }catch(IOException e){
-                e.printStackTrace();
-            }
-
-            int exifOrientation;
-            int exifDegree;
-            if(exif!=null){
-                exifOrientation = exif.getAttributeInt(ExifInterface.TAG_ORIENTATION,
-                        ExifInterface.ORIENTATION_NORMAL);
-
-            } else{
-                exifDegree=0;
-            }
-
         }
-    }
-
+    */
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grandResults) {
 

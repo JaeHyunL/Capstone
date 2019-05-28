@@ -3,24 +3,35 @@ package com.example.androidcameraexample;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FileDescriptor;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.net.URI;
 import java.util.List;
-
-
+import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Matrix;
+import android.graphics.Path;
 import android.hardware.Camera;
 import android.hardware.Camera.Size;
+import android.location.Location;
+import android.location.LocationListener;
+import android.location.LocationManager;
 import android.media.ExifInterface;
 import android.net.Uri;
+import android.nfc.Tag;
 import android.os.AsyncTask;
+import android.os.Build;
+import android.os.Bundle;
 import android.os.Environment;
+import android.support.v4.app.ActivityCompat;
+import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.view.Surface;
@@ -28,7 +39,11 @@ import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.Toast;
+import android.widget.Button;
+import android.widget.CompoundButton;
+import android.widget.Switch;
+import android.widget.TextView;
+import android.widget.ToggleButton;
 
 import static android.media.ExifInterface.*;
 import static android.media.ExifInterface.TAG_IMAGE_LENGTH;
@@ -36,9 +51,8 @@ import static android.media.ExifInterface.TAG_IMAGE_LENGTH;
 
 // 카메라에서 가져온 영상을 보여주는 카메라 프리뷰 클래스
 class CameraPreview extends ViewGroup implements SurfaceHolder.Callback {
-
     private final String TAG = "CameraPreview";
-
+    private MainActivity asdf = new MainActivity();
     private int mCameraID;
     private SurfaceView mSurfaceView;
     private SurfaceHolder mHolder;
@@ -51,14 +65,18 @@ class CameraPreview extends ViewGroup implements SurfaceHolder.Callback {
     private String path2;
     private String fileName;
     private String filePath;
+    private File outputFile;
     private AppCompatActivity mActivity;
     public String imageFilePath;
     private ExifInterface inFile = null;
     private ExifInterface outFile = null;
+    public double latitude;
+    public double longitude;
+
+
+
     public CameraPreview(Context context, AppCompatActivity activity, int cameraID, SurfaceView surfaceView) {
         super(context);
-
-
         Log.d("@@@", "Preview");
 
         mActivity = activity;
@@ -76,20 +94,15 @@ class CameraPreview extends ViewGroup implements SurfaceHolder.Callback {
     }
 
 
-
-
-
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) { //View 가로와 세로를 셋팅함
         final int width = resolveSize(getSuggestedMinimumWidth(), widthMeasureSpec);
         final int height = resolveSize(getSuggestedMinimumHeight(), heightMeasureSpec);
         setMeasuredDimension(width, height);
-
         if (mSupportedPreviewSizes != null) {
             mPreviewSize = getOptimalPreviewSize(mSupportedPreviewSizes, width, height);
         }
     }
-
 
 
     @Override
@@ -118,9 +131,6 @@ class CameraPreview extends ViewGroup implements SurfaceHolder.Callback {
             }
         }
     }
-
-
-
     // Surface가 생성되었을 때 어디에 화면에 프리뷰를 출력할지 알려줘야 한다.
     public void surfaceCreated(SurfaceHolder holder) {
 
@@ -144,8 +154,7 @@ class CameraPreview extends ViewGroup implements SurfaceHolder.Callback {
         mCamera.setDisplayOrientation(orientation);
 
 
-
-        mSupportedPreviewSizes =  mCamera.getParameters().getSupportedPreviewSizes();
+        mSupportedPreviewSizes = mCamera.getParameters().getSupportedPreviewSizes();
         requestLayout();
 
         // get Camera parameters
@@ -177,7 +186,6 @@ class CameraPreview extends ViewGroup implements SurfaceHolder.Callback {
     }
 
 
-
     public void surfaceDestroyed(SurfaceHolder holder) {
         // Surface will be destroyed when we return, so stop the preview.
         // Release the camera for other applications.
@@ -202,7 +210,6 @@ class CameraPreview extends ViewGroup implements SurfaceHolder.Callback {
 
         int targetHeight = h;
 
-        // Try to find an size match aspect ratio and size
         for (Size size : sizes) {
             double ratio = (double) size.width / size.height;
             if (Math.abs(ratio - targetRatio) > ASPECT_TOLERANCE) continue;
@@ -224,7 +231,6 @@ class CameraPreview extends ViewGroup implements SurfaceHolder.Callback {
         }
         return optimalSize;
     }
-
 
 
     public void surfaceChanged(SurfaceHolder holder, int format, int w, int h) {
@@ -262,7 +268,6 @@ class CameraPreview extends ViewGroup implements SurfaceHolder.Callback {
     }
 
 
-
     /**
      * 안드로이드 디바이스 방향에 맞는 카메라 프리뷰를 화면에 보여주기 위해 계산합니다.
      */
@@ -296,8 +301,7 @@ class CameraPreview extends ViewGroup implements SurfaceHolder.Callback {
     }
 
 
-
-    public void takePicture(){
+    public void takePicture() {
 
         mCamera.takePicture(shutterCallback, rawCallback, jpegCallback);
     }
@@ -329,21 +333,22 @@ class CameraPreview extends ViewGroup implements SurfaceHolder.Callback {
             //byte array를 bitmap으로 변환
             BitmapFactory.Options options = new BitmapFactory.Options();
             options.inPreferredConfig = Bitmap.Config.ARGB_8888;
-            Bitmap bitmap = BitmapFactory.decodeByteArray( data, 0, data.length, options);
+            Bitmap bitmap = BitmapFactory.decodeByteArray(data, 0, data.length, options);
 
 
             //이미지를 디바이스 방향으로 회전
             Matrix matrix = new Matrix();
             matrix.postRotate(orientation);
-            bitmap =  Bitmap.createBitmap(bitmap, 0, 0, w, h, matrix, true);
+            bitmap = Bitmap.createBitmap(bitmap, 0, 0, w, h, matrix, true);
 
             //bitmap을 byte array로 변환
             ByteArrayOutputStream stream = new ByteArrayOutputStream();
+
             bitmap.compress(Bitmap.CompressFormat.JPEG, 100, stream);
+
             byte[] currentData = stream.toByteArray();
 
             //파일로 저장
-
 
 
             new SaveImageTask().execute(currentData);
@@ -351,50 +356,114 @@ class CameraPreview extends ViewGroup implements SurfaceHolder.Callback {
         }
     };
 
+    public static class GPS {
+        private static StringBuilder sb = new StringBuilder(20);
+
+        /**
+         * returns ref for latitude which is S or N.
+         *
+         * @param latitude
+         * @return S or N
+         */
+        public static String latitudeRef(double latitude) {
+            return latitude < 0.0d ? "S" : "N";
+        }
+
+        public static String longitudeRef(double longitude) {
+            return longitude < 0.0d ? "W" : "E";
+        }
+
+        /**
+         * convert latitude into DMS (degree minute second) format. For instance<br/>
+         * -79.948862 becomes<br/>
+         * 79/1,56/1,55903/1000<br/>
+         * It works for latitude and longitude<br/>
+         *
+         * @param latitude could be longitude.
+         * @return
+         */
+
+        synchronized public static final String convert(double latitude) {
+            latitude = Math.abs(latitude);
+            int degree = (int) latitude;
+            latitude *= 60;
+            latitude -= (degree * 60.0d);
+            int minute = (int) latitude;
+            latitude *= 60;
+            latitude -= (minute * 60.0d);
+            int second = (int) (latitude * 1000.0d);
+
+            sb.setLength(0);
+            sb.append(degree);
+            sb.append("/1,");
+            sb.append(minute);
+            sb.append("/1,");
+            sb.append(second);
+            sb.append("/1000,");
+            return sb.toString();
+        }
+    }
     private class SaveImageTask extends AsyncTask<byte[], Void, Void> {
+
+
+
+
         @Override
         protected Void doInBackground(byte[]... data) {
             FileOutputStream outStream = null;
 
-
             try {
-
-
-                 path2 = Environment.getExternalStorageDirectory().getAbsolutePath() + "/camtest";
-                File path = new File (Environment.getExternalStorageDirectory().getAbsolutePath() + "/camtest");
+                path2 = Environment.getExternalStorageDirectory().getAbsolutePath() + "/camtest";
+                File path = new File(Environment.getExternalStorageDirectory().getAbsolutePath() + "/camtest");
                 if (!path.exists()) {
 
                     path.mkdirs();
 
                 }
-               fileName = String.format("LeeJaehyun_%d.JPEG", System.currentTimeMillis());
+                fileName = String.format("LeeJaehyun_%d.JPEG", System.currentTimeMillis());
 
-            //    filedata = Exif_Tag(TAG_MAKE,TAG_MODEL);
+                //    filedata = Exif_Tag(TAG_MAKE,TAG_MODEL);
                 File outputFile = new File(path, fileName);
-
                 outStream = new FileOutputStream(outputFile);
+
                 outStream.write(data[0]);
+
                 outStream.flush();
                 outStream.close();
+                Double tag_gps_latitude = 0.0;
+                Double tag_gps_longitude = 0.0;
+                Log.d("Log","메세지"+asdf.latitude1);
 
-
+                Log.d("Log","메세지"+asdf.longitude1);
                 imageFilePath = outputFile.getAbsolutePath();
+                ExifInterface exif = new ExifInterface(imageFilePath);
+                latitude = asdf.latitude1;
+                longitude = asdf.longitude1;
+                String tagLat = exif.getAttribute(ExifInterface.TAG_GPS_LATITUDE);
+                exif.setAttribute(TAG_MAKE, "youngho"); //카메라명
+                exif.setAttribute(ExifInterface.TAG_MODEL, String.valueOf(latitude)); //모델명
+                exif.setAttribute(ExifInterface.TAG_FLASH, "OFF");
+                exif.setAttribute(ExifInterface.TAG_GPS_LATITUDE, GPS.convert(asdf.latitude1));
+                exif.setAttribute(ExifInterface.TAG_GPS_LATITUDE_REF, GPS.latitudeRef(asdf.latitude1));
+                exif.setAttribute(ExifInterface.TAG_GPS_LONGITUDE, GPS.convert(asdf.longitude1));
+                exif.setAttribute(ExifInterface.TAG_GPS_LONGITUDE_REF, GPS.latitudeRef(asdf.longitude1));
 
-                Log.d(TAG, "onPictureTaken - wrote bytes: " + data.length + " to "
-                        + outputFile.getAbsolutePath());
+                Log.d("Log","메세지"+asdf.longitude1);
 
-               mCamera.startPreview();
+                Log.d("Log","메세지"+String.valueOf(asdf.latitude1));
+                exif.saveAttributes();
+
+
+                mCamera.startPreview();
                 // 갤러리에 반영
-                Intent mediaScanIntent = new Intent( Intent.ACTION_MEDIA_SCANNER_SCAN_FILE);
+                Intent mediaScanIntent = new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE);
                 mediaScanIntent.setData(Uri.fromFile(outputFile));
                 getContext().sendBroadcast(mediaScanIntent);
-
 
 
                 try {
                     mCamera.setPreviewDisplay(mHolder);
                     mCamera.startPreview();
-
 
 
                     Log.d(TAG, "Camera preview started.");
@@ -414,48 +483,6 @@ class CameraPreview extends ViewGroup implements SurfaceHolder.Callback {
 
 
     }
-
-  public void EExif(ExifInterface exif) throws IOException {
-
-        String myAttribute = "[Exif information] \n\n";
-        exif.setAttribute(TAG_GPS_LATITUDE,"33");
-        exif.setAttribute(TAG_GPS_LATITUDE_REF,"33");
-        exif.setAttribute(TAG_GPS_LONGITUDE,"33");
-        exif.setAttribute(TAG_GPS_LONGITUDE_REF,"33");
-        exif.setAttribute(TAG_IMAGE_LENGTH,"33");
-        exif.setAttribute(TAG_MODEL,"33");
-        exif.setAttribute(TAG_MAKE,"33");
-/*
-        myAttribute += getTagString(ExifInterface.TAG_DATETIME, exif);
-        myAttribute += getTagString(ExifInterface.TAG_FLASH, exif);
-        myAttribute += getTagString(ExifInterface.TAG_GPS_LATITUDE, exif);
-        myAttribute += getTagString(ExifInterface.TAG_GPS_LATITUDE_REF, exif);
-        myAttribute += getTagString(ExifInterface.TAG_GPS_LONGITUDE, exif);
-        myAttribute += getTagString(ExifInterface.TAG_GPS_LONGITUDE_REF, exif);
-        myAttribute += getTagString(ExifInterface.TAG_IMAGE_LENGTH, exif);
-        myAttribute += getTagString(ExifInterface.TAG_IMAGE_WIDTH, exif);
-        myAttribute += getTagString(ExifInterface.TAG_MAKE, exif);
-        myAttribute += getTagString(ExifInterface.TAG_MODEL, exif);
-        myAttribute += getTagString(ExifInterface.TAG_ORIENTATION, exif);
-        myAttribute += getTagString(ExifInterface.TAG_WHITE_BALANCE, exif);
-*/
-        exif.saveAttributes();
-    }
-
-   String getTagString(String tag, ExifInterface exif) {
-        return (tag + " : " + exif.getAttribute(tag) + "\n");
-    }
-
-
-    public String Exif_Tag(String tagMake, String image_location) throws IOException {
-            ExifInterface exif = new ExifInterface(image_location);
-            exif.setAttribute(TAG_MAKE,"모델명");
-            exif.setAttribute(TAG_MAKE,"제조사");
-        exif.saveAttributes();
-        return tagMake;
-    }
-
-
 
 
 }
